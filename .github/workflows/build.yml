@@ -3,8 +3,8 @@ name: Build Cat Wallpapers
 on:
   push:
     branches: [ "main", "master" ]
-  tags:
-    - 'v*'
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
