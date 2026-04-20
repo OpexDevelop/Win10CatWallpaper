@@ -1,0 +1,72 @@
+name: Build Cat Wallpapers
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  tags:
+    - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install MinGW and tools
+        run: sudo apt-get update && sudo apt-get install -y mingw-w64 python3
+
+      - name: Generate Header for Local Images
+        run: |
+          python3 -c "
+          import os
+          os.makedirs('images', exist_ok=True)
+          files = [f for f in os.listdir('images') if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+          with open('cat_images.h', 'w') as out:
+              out.write('#include <stddef.h>\n')
+              if not files:
+                  out.write('struct CatImg { const unsigned char* data; size_t len; };\n')
+                  out.write('struct CatImg cats[1];\n')
+                  out.write('const int cats_count = 0;\n')
+              else:
+                  for i, f in enumerate(files):
+                      with open(os.path.join('images', f), 'rb') as img:
+                          data = img.read()
+                          hex_arr = ', '.join([f'0x{b:02x}' for b in data])
+                          out.write(f'const unsigned char img_{i}[] = {{{hex_arr}}};\n')
+                          out.write(f'const size_t img_{i}_len = {len(data)};\n')
+                  out.write('struct CatImg { const unsigned char* data; size_t len; };\n')
+                  out.write(f'struct CatImg cats[{len(files)}] = {{\n')
+                  for i in range(len(files)):
+                      out.write(f'    {{img_{i}, img_{i}_len}},\n')
+                  out.write('};\n')
+                  out.write(f'const int cats_count = {len(files)};\n')
+          "
+
+      - name: Compile Executables
+        run: |
+          x86_64-w64-mingw32-gcc local_cats.c -o cat_local_random.exe -mwindows
+          x86_64-w64-mingw32-gcc online_cat.c -o cat_online.exe -mwindows -lurlmon
+          x86_64-w64-mingw32-gcc restore.c -o restore_wallpaper.exe -mwindows
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: WallpapersExe
+          path: |
+            cat_local_random.exe
+            cat_online.exe
+            restore_wallpaper.exe
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            cat_local_random.exe
+            cat_online.exe
+            restore_wallpaper.exe
