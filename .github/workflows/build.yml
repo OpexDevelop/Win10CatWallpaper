@@ -20,6 +20,28 @@ jobs:
       - name: Install MinGW and tools
         run: sudo apt-get update && sudo apt-get install -y mingw-w64 python3
 
+      # НОВЫЙ ШАГ: Скачиваем 20 картинок с котами
+      - name: Download Extra Cat Images
+        run: |
+          python3 -c "
+          import urllib.request, os, random, time
+          os.makedirs('images', exist_ok=True)
+          print('Downloading 20 extra cats...')
+          for i in range(20):
+              url = f'https://cataas.com/cat?t={random.randint(1, 100000)}'
+              try:
+                  # Представляемся браузером, чтобы сервера нас не блокировали
+                  req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
+                  with urllib.request.urlopen(req) as response, open(f'images/extra_cat_{i}.jpg', 'wb') as out_file:
+                      data = response.read()
+                      if len(data) > 5000: # Убеждаемся, что файл не пустой
+                          out_file.write(data)
+                          print(f'Downloaded cat {i+1}/20')
+              except Exception as e:
+                  print(f'Failed to download {i+1}: {e}')
+              time.sleep(1) # Делаем паузу в 1 секунду между скачиваниями, чтобы сервер нас не забанил за спам
+          "
+
       - name: Generate Header for Local Images
         run: |
           python3 -c "
@@ -50,7 +72,6 @@ jobs:
       - name: Compile Executables
         run: |
           x86_64-w64-mingw32-gcc local_cats.c -o cat_local_random.exe -mwindows
-          x86_64-w64-mingw32-gcc online_cat.c -o cat_online.exe -mwindows -lurlmon -lwininet
           x86_64-w64-mingw32-gcc restore.c -o restore_wallpaper.exe -mwindows
 
       - name: Upload Artifacts
@@ -59,7 +80,6 @@ jobs:
           name: WallpapersExe
           path: |
             cat_local_random.exe
-            cat_online.exe
             restore_wallpaper.exe
 
       - name: Create Release
@@ -68,5 +88,4 @@ jobs:
         with:
           files: |
             cat_local_random.exe
-            cat_online.exe
             restore_wallpaper.exe
